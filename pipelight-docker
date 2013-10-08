@@ -1,0 +1,111 @@
+#!/bin/bash
+# curl -s https://raw.github.com/Thermionix/Dockerfiles/master/pipelight/pipelight-docker | bash
+echo "## dockerized pipelight accessible via x11 fowarding"
+
+command -v docker > /dev/null || { echo "## please install docker" ; exit 1 ; }
+command -v ssh > /dev/null || { echo "## please install ssh" ; exit 1 ; }
+command -v whiptail > /dev/null || { echo "## please install whiptail" ; exit 1 ; }
+
+SSHKEY=~/.ssh/id_rsa.pub
+[ -f $SSHKEY ] || { echo "## please use ssh-keygen to generate an ssh key" ; exit 1 ; }
+
+BROWSER=midori #firefox chromium-browser
+IMAGENAME=pipelight
+
+BUILDIMAGE=false
+if sudo docker inspect $IMAGENAME 2>&1 | grep -q "No such image" ; then
+	echo "## Couldn't find image $IMAGENAME, will attempt to build"
+	BUILDIMAGE=true
+fi
+if ! $BUILDIMAGE ; then
+	if whiptail --yesno --defaultno "rebuild $IMAGENAME image ?" 8 50 ; then
+		BUILDIMAGE=true
+	fi
+fi
+if $BUILDIMAGE ; then
+	cat <<-'EOF' | sed "s/BROWSER/$BROWSER/" | sudo docker build -t "$IMAGENAME" -
+		from	ubuntu:12.10
+		 
+		env		DEBIAN_FRONTEND noninteractive
+		run		apt-get install -y --no-install-recommends software-properties-common
+		run		dpkg --add-architecture i386 && apt-get update
+
+		run		dpkg-divert --local --rename --add /sbin/initctl && ln -s /bin/true /sbin/initctl
+
+		run		apt-get install -y --no-install-recommends xpra xdm libxrandr2 ssh
+
+		run 	localedef -v -c -i en_US -f UTF-8 en_US.UTF-8 || :
+
+		run 	apt-add-repository -y ppa:mqchael/pipelight
+		run 	apt-add-repository -y ppa:ehoover/compholio
+		run		apt-get update
+		run 	apt-get install -y --force-yes pipelight wine-silverlight5.1-installer wine-compholio wine-mpg2splt-installer
+
+		run 	apt-get install -y --no-install-recommends BROWSER
+
+		run		sed -i 's/DisplayManager.requestPort/!DisplayManager.requestPort/g' /etc/X11/xdm/xdm-config
+		run		sed -i '/#any host/c\*' /etc/X11/xdm/Xaccess
+		run		ln -s /usr/bin/Xorg /usr/bin/X
+
+		run		echo "X11Forwarding yes" >> /etc/ssh/ssh_config
+		run		echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
+
+		#RSAAuthentication yes
+		#PubkeyAuthentication yes
+		#ChallengeResponseAuthentication no
+		#PasswordAuthentication no
+		#UsePAM no
+
+		run		mkdir -p /var/run/sshd
+
+		#volume	/home/docker/
+
+		run		mkdir -p /home/docker/.ssh
+		run		useradd -M -s /bin/bash -d /home/docker docker
+		run		sed -Ei 's/adm:x:4:/docker:x:4:docker/' /etc/group
+
+		run		touch /home/docker/.ssh/authorized_keys
+		run		chmod 0640 /home/docker/.ssh/authorized_keys
+
+		#run		echo "export LIBGL_ALWAYS_INDIRECT=0" > /home/docker/.ssh/rc
+
+		run		mkdir -p /home/docker/.config
+		run		cp /usr/share/pipelight/pipelight /home/docker/.config/pipelight
+		run		echo -e "\noverwriteArg = enableGPUAcceleration=true" >> /home/docker/.config/pipelight
+
+		run		chown -R docker:docker /home/docker
+
+		run		echo "#!/bin/bash" > /usr/bin/start
+		run		echo "[[ -z \"\$1\" ]] && { echo \"please provide ssh key to start\" ; exit 1 ; }" >> /usr/bin/start
+		run		echo "echo \"\$1\" >> /home/docker/.ssh/authorized_keys" >> /usr/bin/start
+		run		echo "/etc/init.d/xdm start && /usr/sbin/sshd -D" >> /usr/bin/start
+		run		chmod +x /usr/bin/start
+		entrypoint		["/usr/bin/start"]
+	EOF
+fi
+
+# sudo docker run pipelight echo "checkcheck" | grep "^checkcheck" || { exit 1 ; }
+
+JOB=$(sudo docker run -d $IMAGENAME "`cat $SSHKEY`")
+
+IPADDR=$(sudo docker inspect $JOB | grep IPAd | awk -F'"' '{print $4}')
+
+echo -e "image: $IMAGENAME container: $JOB accesible on ip: $IPADDR\n"
+
+#Prefs.js
+#user_pref("general.useragent.override","Mozilla/5.0 (Windows NT 6.1; WOW64; rv:22.0) Gecko/20100101 Firefox/22.0");
+
+# $1 first param as query string? 
+#e.g. http://atwar-game.com/play/
+#test silverlight: http://bubblemark.com/silverlight2.html
+#firefox about:plugins
+
+remotecmd="export LIBGL_ALWAYS_INDIRECT=0"
+#remotecmd+=" && export LIBGL_DEBUG=verbose"
+#remotecmd+=" && glxinfo | grep OpenGL"
+#remotecmd+=" && glxinfo | grep direct"
+remotecmd+=" && $BROWSER"
+
+ssh -XCt -c blowfish-cbc,arcfour -oStrictHostKeyChecking=no -oCheckHostIP=no docker@$IPADDR $remotecmd
+
+sudo docker stop $JOB
