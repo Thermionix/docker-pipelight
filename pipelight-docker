@@ -1,5 +1,4 @@
 #!/bin/bash
-# curl -s https://raw.github.com/Thermionix/Dockerfiles/master/pipelight/pipelight-docker | bash
 echo "## dockerized pipelight accessible via x11 fowarding"
 
 command -v docker > /dev/null || { echo "## please install docker" ; exit 1 ; }
