@@ -3,7 +3,7 @@ echo "## dockerized pipelight accessible via x11 fowarding"
 
 command -v docker > /dev/null || { echo "## please install docker" ; exit 1 ; }
 command -v ssh > /dev/null || { echo "## please install ssh" ; exit 1 ; }
-command -v whiptail > /dev/null || { echo "## please install whiptail" ; exit 1 ; }
+command -v whiptail > /dev/null || { echo "## please install whiptail (libnewt)" ; exit 1 ; }
 
 SSHKEY=~/.ssh/id_rsa.pub
 [ -f $SSHKEY ] || { echo "## please use ssh-keygen to generate an ssh key" ; exit 1 ; }
