@@ -26,9 +26,8 @@ if $BUILDIMAGE ; then
 		from	ubuntu:12.10
 		 
 		env		DEBIAN_FRONTEND noninteractive
-		run		apt-get update		
-		run		apt-get install -y --no-install-recommends software-properties-common
 		run		dpkg --add-architecture i386 && apt-get update
+		run		apt-get install -y --no-install-recommends software-properties-common
 
 		run		dpkg-divert --local --rename --add /sbin/initctl && ln -s /bin/true /sbin/initctl
 
