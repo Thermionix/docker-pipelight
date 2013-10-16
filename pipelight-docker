@@ -69,8 +69,8 @@ if $BUILDIMAGE ; then
 		#run		echo "export LIBGL_ALWAYS_INDIRECT=0" > /home/docker/.ssh/rc
 
 		run		mkdir -p /home/docker/.config
-		run		cp /usr/share/pipelight/pipelight /home/docker/.config/pipelight
-		run		echo -e "\noverwriteArg = enableGPUAcceleration=true" >> /home/docker/.config/pipelight
+		#run		cp /usr/share/pipelight/pipelight /home/docker/.config/pipelight
+		#run		echo -e "\noverwriteArg = enableGPUAcceleration=true" >> /home/docker/.config/pipelight
 
 		run		chown -R docker:docker /home/docker
 
